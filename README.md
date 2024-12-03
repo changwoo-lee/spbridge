@@ -1,15 +1,12 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# spbridge
+# Marginally interpretable spatial logistic regression with bridge processes
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of spbridge is to …
-
-What is special about using `README.Rmd` instead of just `README.md`?
-You can include R chunks like so:
+This spbridge repository is for…
 
 ``` r
 library(geoR)
