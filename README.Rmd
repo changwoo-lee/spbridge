@@ -11,15 +11,112 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Marginally interpretable spatial logistic regression with bridge processes
+# spbridge: Marginally interpretable spatial logistic regression with bridge processes
+
+This is a software repository corresponding to the manuscript
+
+> "Marginally interpretable spatial logistic regression with bridge processes" by Changwoo Lee and David B. Dunson
+
+See R folder for the functions, which contains 
+
+- bridge.R: univariate and multivariate bridge distribution and normal variance mixing distributions
+- splogi_bridge.R: spatial logistic model with bridge process random effect, using Matern kernel
+- splogi_bridge_lowrank.R: spatial logistic model with bridge process random effect, using low-rank Matern kernel
+- splogi_gaussian.R: spatial logistic model with Gaussian process random effect, using Matern kernel
+- splogi_gaussian_lowrank.R: spatial logistic model with Gaussian process random effect, using low-rank Matern kernel
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-This spbridge repository is for...
+## Case study: Childhood malaria in the Gambia
 
-
-```{r cars}
-library(geoR)
+### 1. Data preparation
+```{r}
+library(geoR)# read the data 
 data(gambia)
+N = length(gambia$pos) # 2035
+n = length(unique(gambia$x)) # 65
+y = gambia$pos # binary response, N = 2035 by 1 vector
+
+# standardized covariates following Gelman et al (2008)
+intercept = rep(1,N) # intercept
+age = scale(gambia$age/365, scale = 2*sd(gambia$age/365)) # in years
+netuse = gambia$netuse - mean(gambia$netuse)
+treated = gambia$treated - mean(gambia$treated)
+green = scale(gambia$green, scale = 2*sd(gambia$green))
+green2 = scale(gambia$green^2, scale = 2*sd(gambia$green^2))
+healthctr = gambia$phc - mean(gambia$phc)
+
+X = cbind(intercept, age, netuse, treated, green, green2, healthctr)
+colnames(X) = c("(Intercept)", "age", "netuse", "treated", "green", "green2", "healthctr")
+
+centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated), 
+            attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
+scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
+  
+# define id based on spatial coords unique values
+id = as.numeric(factor(paste(gambia$x, gambia$y))) 
+coords = unique(cbind(gambia$x, gambia$y)/1000) # n by 2 matrix, in km
+```
+
+
+### 2. Fit the spatial logistic models
+```{r, warning=F, message=F}
+source("R/bridge.R")
+source("R/miscfunctions.R")
+source("R/splogi_bridge.R")
+source("R/splogi_gaussian.R")
+```
+
+```{r, cache = T}
+fit_bridge = splogi_bridge(y = y,
+                   X = X,
+                   id = id,
+                   priors = list(beta_intercept_scale = 10,
+                                 beta_scale = 2.5, beta_df = Inf, 
+                                 rho_lb = 0.01, rho_ub = 100),
+                   coords = coords,
+                   smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+fit_bridge$t_mcmc
+fit_gaussian = splogi_gaussian(y = y,
+                   X = X,
+                   id = id,
+                   priors = list(beta_intercept_scale = 10,
+                                 beta_scale = 2.5, beta_df = Inf, 
+                                 rho_lb = 0.01, rho_ub = 100),
+                   coords = coords,
+                   smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+fit_gaussian$t_mcmc
+
+```
+
+
+### 3. Summarize the result
+```{r}
+scaleback <- function(x, centers, scales){
+  c(x[1] - sum((x[-1] * centers) / scales),
+    x[-1] / scales)
+}
+
+# summary from bridge process
+beta_b_save = fit_bridge$post_save[,1:ncol(X)]
+beta_b_save_orig = coda::mcmc(t(apply(beta_b_save, 1, scaleback, centers, scales)))
+betam_b_save_orig = coda::mcmc(t(apply(fit_bridge$betam_save, 1, scaleback, centers, scales)))
+
+
+summary(betam_b_save_orig)# population-averaged, bridge process random effect
+
+summary(beta_b_save_orig)# site(subject)-specific, bridge process random effect 
+
+# Compare with Gaussian process random effects model
+beta_g_save = fit_gaussian$post_save[,1:ncol(X)]
+beta_g_save_orig = coda::mcmc(t(apply(beta_g_save, 1, scaleback, centers, scales)))
+summary(beta_g_save_orig)# site(subject)-specific, Gaussian process random effect
+```
+
+```{r}
+# further mcmc summary examples
+library(bayesplot)
+mcmc_trace(fit_bridge$post_save)
+mcmc_trace(fit_gaussian$post_save)
 ```

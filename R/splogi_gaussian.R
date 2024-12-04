@@ -66,9 +66,6 @@ splogi_gaussian <- function(y, X, id,
   if(length(id)!=N) stop("length(id) must be equal to nrow(X)")
   # sanity check for range and smoothness which should be positive reals
   if(smoothness <= 0) stop("smoothness must be positive reals")
-  if(rho_lb <= 0) stop("rho_lb must be positive reals")
-  if(rho_ub <= 0) stop("rho_ub must be positive reals")
-  if(rho_lb >= rho_ub) stop("rho_lb must be less than rho_ub")
   # sanity check for z which should be a vector of binary
   if(!is.vector(y) || !all(y %in% c(0,1))) stop("y must be a vector of binary")
   if(N>n){
@@ -197,7 +194,7 @@ splogi_gaussian <- function(y, X, id,
     # on this transformed space, run random walk with bivariate normal proposal
 
     sigu2_trans = log(sigu2)
-    rho_trans = gen_logit(rho, xmin = rho_lb, xmax = rho_ub)
+    rho_trans = glogit(rho, xmin = rho_lb, xmax = rho_ub)
 
     if(imcmc < start_adapt){
       proposal = c(sigu2_trans, rho_trans) + spam::rmvnorm(1, rep(0,2), C0)
@@ -291,7 +288,11 @@ splogi_gaussian <- function(y, X, id,
   # waic
 
   out = list()
-  colnames(beta_save) = colnames(model.matrix(y~ -1+X))
+  if(is.null(colnames(X))){
+    colnames(beta_save) = colnames(model.matrix(y~ -1+X))
+  }else{
+    colnames(beta_save) = colnames(X)
+  }
   sigu2_save = matrix(sigu2_save); colnames(sigu2_save) = "sigu2"
   rho_save = matrix(rho_save); colnames(rho_save) = "rho"
 

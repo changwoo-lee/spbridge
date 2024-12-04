@@ -41,7 +41,7 @@ find_phi_bridge <- function(var){
 }
 
 
-
+# Below are copied from "bridgedist" R package by Bruce Swihart
 # source: https://github.com/swihart/bridgedist/blob/master/R/Bridge.R
 
 dbridge <- function(x, phi = 1/2, log = FALSE){

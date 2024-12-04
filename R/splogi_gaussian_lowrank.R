@@ -66,9 +66,6 @@ splogi_gaussian_lowrank <- function(y, X, id,
   if(length(id)!=N) stop("length(id) must be equal to nrow(X)")
   # sanity check for range and smoothness which should be positive reals
   if(smoothness <= 0) stop("smoothness must be positive reals")
-  if(rho_lb <= 0) stop("rho_lb must be positive reals")
-  if(rho_ub <= 0) stop("rho_ub must be positive reals")
-  if(rho_lb >= rho_ub) stop("rho_lb must be less than rho_ub")
   # sanity check for z which should be a vector of binary
   if(!is.vector(y) || !all(y %in% c(0,1))) stop("y must be a vector of binary")
   if(N>n){
@@ -342,11 +339,15 @@ splogi_gaussian_lowrank <- function(y, X, id,
 
   # waic
   out = list()
-  colnames(beta_save) = colnames(model.matrix(y~ -1+X))
+  if(is.null(colnames(X))){
+    colnames(beta_save) = colnames(model.matrix(y~ -1+X))
+  }else{
+    colnames(beta_save) = colnames(X)
+  }
   sigu2_save = matrix(sigu2_save); colnames(sigu2_save) = "sigu2"
   rho_save = matrix(rho_save); colnames(rho_save) = "rho"
 
-  out$post = coda::mcmc(cbind(beta_save, sigu2_save, rho_save))
+  out$post_save = coda::mcmc(cbind(beta_save, sigu2_save, rho_save))
   colnames(u_save) = unique(id)
   out$u_save = coda::mcmc(u_save)
 

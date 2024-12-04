@@ -68,9 +68,6 @@ splogi_bridge_lowrank <- function(y, X, id,
   if(length(id)!=N) stop("length(id) must be equal to nrow(X)")
   # sanity check for range and smoothness which should be positive reals
   if(smoothness <= 0) stop("smoothness must be positive reals")
-  if(rho_lb <= 0) stop("rho_lb must be positive reals")
-  if(rho_ub <= 0) stop("rho_ub must be positive reals")
-  if(rho_lb >= rho_ub) stop("rho_lb must be less than rho_ub")
   # sanity check for z which should be a vector of binary
   if(!is.vector(y) || !all(y %in% c(0,1))) stop("y must be a vector of binary")
   if(N>n){
@@ -356,12 +353,16 @@ splogi_bridge_lowrank <- function(y, X, id,
 
   # waic
   out = list()
-  colnames(beta_save) = colnames(model.matrix(y~ -1+X))
+  if(is.null(colnames(X))){
+    colnames(beta_save) = colnames(model.matrix(y~ -1+X))
+  }else{
+    colnames(beta_save) = colnames(X)
+  }
   phi_save = matrix(phi_save); colnames(phi_save) = "phi"
   lambda_save = matrix(lambda_save); colnames(lambda_save) = "lambda"
   rho_save = matrix(rho_save); colnames(rho_save) = "rho"
 
-  out$post = coda::mcmc(cbind(beta_save, phi_save, lambda_save, rho_save))
+  out$post_save = coda::mcmc(cbind(beta_save, phi_save, lambda_save, rho_save))
   betam_save = beta_save*as.numeric(phi_save)
   out$betam_save = coda::mcmc(betam_save)
   colnames(u_save) = unique(id)
