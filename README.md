@@ -27,10 +27,14 @@ See R folder for the functions, which contains
 ## Motivation
 
 Consider the following logistic mixed model with a spatial random effect
-for spatially indexed binary data: $$
+for spatially indexed binary data:
+
+$$
 \mathrm{logit}\{\mathrm{Pr}(Y_{ij} = 1 \mid x_{ij}, u(s_i))\} = x_{ij}^T\beta + u(s_i), \quad u(\cdot)\sim \text{ mean zero process}
-$$ where $i=1,\dots,n$, $j=1,\dots,N_i$, $Y_{ij}$ is a binary response
-at location $i$ and individual $j$, $x_{ij}$ is a vector of covariates,
+$$
+
+where $i=1,\dots,n$, $j=1,\dots,N_i$, $Y_{ij}$ is a binary response at
+location $i$ and individual $j$, $x_{ij}$ is a vector of covariates,
 $\beta$ is a vector of regression coefficients, and $u(s_i)$ is a
 spatial random effect at location $s_i$. When $N_i=1$ for all $i$, this
 reduces to point-referenced spatial binary data.
