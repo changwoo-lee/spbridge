@@ -58,18 +58,19 @@ $\mathrm{logit}\{\mathrm{Pr}(Y_{ij} = 1 \mid x_{ij})\}$ is no longer a
 linear function of $x_{ij}$, and marginal interpretation of regression
 coefficient is lost.
 
-We develop marginally interpretable spatial logistic model for
-researchers who wish **(1) population-averaged log-odds interpretation
-of regression parameters, (2) taking account of spatial dependence (3)
-prediction of probability of $Y$ at a new location, all in a single
-modeling framework**. Based on the work of [Wang and Louis
-(2003)](#references), we propose a novel stochastic process called
-bridge process for spatial random effects based on normal scale mixture
-that allows marginal interpretation of regression coefficients in
-spatial logistic regression. Under a Bayesian framework, the inference
-is carried out with highly efficient MCMC algorithm leveraging normal
-mixture representation and Polya-Gamma data augmentation [(Polson et
-al., 2013)](#references).
+We develop a marginally interpretable spatial logistic model for
+researchers who wish to **(1) have both population-averaged and
+site-specific log-odds ratio interpretation of regression parameters,
+(2) take account of spatial dependence, and (3) enable prediction of
+probability of $Y$ at a new location, all in a single modeling
+framework**. Extending the work of [Wang and Louis (2003)](#references),
+we propose a novel stochastic process called bridge process for spatial
+random effects based on normal scale mixture that allows marginal
+interpretation of regression coefficients in spatial logistic
+regression. Under a Bayesian framework, the inference is carried out
+with highly efficient MCMC algorithm leveraging normal mixture
+representation and Polya-Gamma data augmentation [(Polson et al.,
+2013)](#references).
 
 ## Case study: Childhood malaria in the Gambia
 
