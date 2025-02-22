@@ -113,6 +113,9 @@ splogi_bridge_lowrank <- function(y, X, id,
     rho_ub = priors$rho_ub
   }
 
+  # Initialize
+  phi = 0.5
+  rho = (rho_lb + rho_ub)/2
   beta_s = c(beta_intercept_scale, rep(beta_scale,p-1))
 
 
@@ -135,9 +138,6 @@ splogi_bridge_lowrank <- function(y, X, id,
 
 
 
-  # Initialize
-  phi = 0.5
-  rho = (rho_lb + rho_ub)/2
   #R = fields::Matern(distmat, range = rho, smoothness = smoothness)
   #Rinv = solve(R)
   lambda_particles = rbridgemixing(nparticle, phi = phi) # each row is a set of particles
