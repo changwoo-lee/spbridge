@@ -1,5 +1,4 @@
 library(Matrix)
-library(Rfast)
 library(spam)
 library(fields)
 library(lme4)
@@ -123,8 +122,8 @@ splogi_gaussian <- function(y, X, id,
   gamma = rep(2.5,p) # scale mixture
   linpred = X%*%beta
   omega = rep(1,N)
-  omega_grp = Rfast::group(omega, id, method = "sum")
-
+  #omega_grp = Rfast::group(omega, id, method = "sum")
+  omega_grp = as.numeric(rowsum(as.matrix(omega), group = id))
   # Saving objects
   nmcmc = nburn + nsave*nthin
   rho_save = array(0, dim = c(nsave))
@@ -206,7 +205,8 @@ splogi_gaussian <- function(y, X, id,
 
     R_star = fields::Matern(distmat, range = rho_star, smoothness = smoothness)
     y0.5_Xbomega = (y - 0.5) - Xbeta*omega
-    y0.5_Xbomega_grp = Rfast::group(y0.5_Xbomega, id, method = "sum") # t(Z)%*%y0.5_Xbomega
+    #y0.5_Xbomega_grp = Rfast::group(y0.5_Xbomega, id, method = "sum") # t(Z)%*%y0.5_Xbomega
+    y0.5_Xbomega_grp = as.numeric(rowsum(as.matrix(y0.5_Xbomega), group = id))
     linpred_proxy = y0.5_Xbomega_grp/omega_grp
 
 
@@ -264,7 +264,8 @@ splogi_gaussian <- function(y, X, id,
     #t4 = t4 + as.numeric(difftime(Sys.time(), t4_start, units = "secs"))
 
     # update
-    omega_grp = Rfast::group(omega, id, method = "sum")
+    #omega_grp = Rfast::group(omega, id, method = "sum")
+    omega_grp = as.numeric(rowsum(as.matrix(omega), group = id))
     ZtOmegaX = (t(Z*omega)%*%X)
     XtOmegaX = (t(X*omega)%*%X)
 
