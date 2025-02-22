@@ -331,7 +331,6 @@ splogi_bridge_lowrank <- function(y, X, id,
     # update
     #omega_grp = Rfast::group(omega, id, method = "sum")
     omega_grp = as.numeric(rowsum(as.matrix(omega), group = id))
-    as.numeric(rowsum(as.matrix(kappa), group = id))
     ZtOmegaX = (t(Z*omega)%*%X)
     XtOmegaX = (t(X*omega)%*%X)
 
