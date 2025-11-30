@@ -24,14 +24,20 @@ You can install the development version from [GitHub](https://github.com/) with:
 
 ```{r, eval = F}
 # install.packages("devtools")
-devtools::install_github("changwoo-lee/spbridge")
+devtools::install_github("changwoo-lee/spbridge", build_manual = TRUE)
 ```
 
 
 ## Package manual
 
-See spbridge_1.0.0.1.pdf for the package manual and example codes.
-<!-- See R folder for the functions, which contains  -->
+See ?(function_name) for documentation of each function. For example,
+
+```{r, eval = F}
+library(spbridge)
+?splogi_bridge
+```
+
+See spbridge_1.0.0.1.pdf for the package manual and all available functions. 
 
 <!-- - bridge.R: univariate and multivariate bridge distribution and normal variance mixing distributions -->
 <!-- - splogi_bridge.R: spatial logistic model with bridge process random effect, using Matern kernel -->
