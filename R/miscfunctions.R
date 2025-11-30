@@ -5,29 +5,31 @@ glogit <- function(x, xmin, xmax){
   x01 = (x - xmin)/(xmax - xmin)
   return(log(x01/(1-x01)))
 }
+gen_logit <- function(x, xmin, xmax){
+  x01 = (x - xmin)/(xmax - xmin)
+  return(log(x01/(1-x01)))
+}
 # inverse of glogit
 inv_glogit <- function(x, xmin, xmax){
   x01 = 1/(1+exp(-x))
   return(x01*(xmax - xmin) + xmin)
 }
 
-#' calculate N_d(y | mu, XDX^t+ E), E = diag(evec)
-#'
-#' utilizing Woodbury matrix identity (XDX^t + E)^(-1) = E^(-1) - E^(-1)X(D^(-1)+ X^t E^(-1) X)^(-1) X^t E^(-1)
-#' and matrix determinant lemma det(XDX^t + E) = det(D^(-1)+ X^t E^(-1) X) det(D) det(E)
-#'
-#' @param y n by d
-#' @param mu length d
-#' @param X d by k, k<<d
-#' @param Dinv inverse of D
-#' @param Dlogdet log determinant of D, optional
-#' @param Ediag length d, diagonal of E
-#' @param log logical
-#'
-#' @return
-#' @export
-#'
-#' @examples
+inv_gen_logit <- function(x, xmin, xmax){
+  x01 = 1/(1+exp(-x))
+  return(x01*(xmax - xmin) + xmin)
+}
+# calculate N_d(y | mu, XDX^t+ E), E = diag(evec)
+# utilizing Woodbury matrix identity (XDX^t + E)^(-1) = E^(-1) - E^(-1)X(D^(-1)+ X^t E^(-1) X)^(-1) X^t E^(-1)
+# and matrix determinant lemma det(XDX^t + E) = det(D^(-1)+ X^t E^(-1) X) det(D) det(E)
+#
+# y: n by d
+# mu: length d
+# X: d by k, k<<d
+# Dinv: inverse of D
+# Dlogdet: log determinant of D, optional
+# Ediag: length d, diagonal of E
+# log: logical
 dmvn_lowrankstr = function(y, mu, X, Dinv, Dlogdet = NULL, Ediag, log = T){
   dimen = length(Ediag)
   if(is.vector(y)) y = matrix(y, ncol = dimen)

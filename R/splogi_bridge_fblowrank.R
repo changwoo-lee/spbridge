@@ -1,41 +1,43 @@
-#' Spatial logistic model with Gaussian process random effect
+#' Spatial logistic model with bridge process random effect with low-rank structure (fully Bayes)
 #'
 #' \deqn{
 #' \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
 #'   = X_{ij}^\top \beta + u(s_i)
 #' }
-#' where u(s) ~ Gaussian process with Matern correlation kernel, i=1,...n corresponds to n spatial locations and
+#' where u(s) ~ Bridge process with Matern correlation kernel with low-rank structure, i=1,...n corresponds to n spatial locations and
 #' j=1,... N_i correspond to n_i responses at location i,
 #' resulting data of size N = N_1 + ... N_n.
 #'
 #' Priors are specified by "priors" argument, which is a list of hyperparameters.
 #' Specifically, we set zero centered normal or t prior for beta,
 #' uniform prior for Matern range parameter rho (see fields::Matern),
-#' and for sigu2, we use prior that induces half-Cauchy prior on the standard deviation of u.
+#' and for phi, we use prior that induces half-Cauchy prior on the standard deviation of u.
 #'
 #' priors is a named list with the following possible elements:
 #' \describe{
-#' \item{beta_intercept_scale}{scale of intercept parameter (default 10)}
-#' \item{beta_scale}{scale of other beta parameters (default 2.5)}
-#' \item{beta_df}{degrees of freedom for t prior on beta (default Inf, normal prior)}
-#' \item{logpriorsigu2}{function for log-prior on sigu2 (default prior that induces half-Cauchy prior on the standard deviation of u.)}
-#' \item{rho_lb}{lower bound for range parameter rho (default min distance between coords)}
-#' \item{rho_ub}{upper bound for range parameter rho (default max distance between coords)}
+#'   \item{beta_intercept_scale}{scale of intercept parameter (default 10)}
+#'   \item{beta_scale}{scale of other beta parameters (default 2.5)}
+#'   \item{beta_df}{degrees of freedom for t prior on beta (default Inf, normal prior)}
+#'   \item{logpriorphi}{function for log-prior on phi (default prior that induces half-Cauchy prior on the standard deviation of u.)}
+#'   \item{rho_lb}{lower bound for range parameter rho (default min distance between coords)}
+#'   \item{rho_ub}{upper bound for range parameter rho (default max distance between coords)}
 #' }
-#'
 #'
 #' @param y N x 1 binary vector
 #' @param X N x p fixed-effect design matrix, including intercept
 #' @param id N x 1 vector of spatial location id. When N=n, it is point-referenced data
 #' @param coords n x 2 matrix of spatial coordinates
+#' @param coords_knot q x 2 matrix of knot coordinates
 #' @param priors list of prior hyperparameters, see details
 #' @param smoothness postive numeric, Matern smoothness parameter
 #' @param nburn number of burn-in interation
 #' @param nsave number of posterior samples
 #' @param nthin thin-in rate
+#' @param nparticle number of particles in particle marginal Metropolis-Hastings
 #' @param verbose logical, whether to print progress
 #'
-#' @return list, including posterior samples of beta, sigu2, rho, and u saved in "post_save".
+#' @return list, including posterior samples of beta, phi, rho, and u saved in "post_save".
+#' Population-averaged coefficient, which is beta*phi, is saved separately as "betam_save"
 #' @export
 #'
 #' @examples
@@ -64,7 +66,7 @@
 #' centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
 #'             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
 #' scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
-#' fit_bridge = spbridge::splogi_gaussian(y = y,
+#' fit_bridge = spbridge::splogi_bridge_fblowrank(y = y,
 #'                                         X = X,
 #'                                         id = id,
 #'                                         priors = list(beta_intercept_scale = 10,
@@ -74,14 +76,15 @@
 #'                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 #' }
 #'
-splogi_gaussian <- function(y, X, id,
-                             coords,
-                             priors = list(beta_intercept_scale = 10,
-                                           beta_scale = 2.5, beta_df = Inf,
-                                           logpriorsigu2 = NULL,
-                                           rho_lb = NULL, rho_ub = NULL),
-                             smoothness = 1.5,
-                             nburn = 100, nsave = 1000, nthin = 1,  verbose=TRUE){
+#'
+splogi_bridge_fblowrank <- function(y, X, id,
+                                     coords, coords_knot,
+                                     priors = list(beta_intercept_scale = 10,
+                                                   beta_scale = 2.5, beta_df = Inf,
+                                                   logpriorphi = NULL,
+                                                   rho_lb = NULL, rho_ub = NULL),
+                                     smoothness = 1.5,
+                                     nburn = 100, nsave = 1000, nthin = 1, nparticle = 20, verbose=TRUE){
 
   t_start = Sys.time()
   #############################################
@@ -122,13 +125,13 @@ splogi_gaussian <- function(y, X, id,
   }else{
     beta_scale = priors$beta_scale
   }
-  if(is.null(priors$logpriorsigu2)){
-    logpriorsigu2 = function(x) -log(sqrt(x)*(1+x)) - log(pi) # corresponding to half-cauchy on stdev
-    priors$logpriorsigu2 = logpriorsigu2
+  if(is.null(priors$logpriorphi)){
+    logpriorphi = function(x) log(2*sqrt(3)/((pi^2 - (pi^2-3)*x^2)*sqrt(1-x^2))) # corresponding to half-cauchy on stdev
+    priors$logpriorphi = logpriorphi
   }else{
-    # check whether priors$sigu2 is a function
-    if(!is.function(priors$logpriorsigu2)) stop("priors$logpriorsigu2 must be a function")
-    logpriorsigu2 = priors$logpriorsigu2
+    # check whether priors$phi is a function
+    if(!is.function(priors$logpriorphi)) stop("priors$logpriorphi must be a function")
+    logpriorphi = priors$logpriorphi
   }
   if(is.null(priors$rho_lb)){ #uniform prior, lower bound
     rho_lb = min(distmat[distmat>0]); priors$rho_lb = rho_lb
@@ -141,13 +144,35 @@ splogi_gaussian <- function(y, X, id,
     rho_ub = priors$rho_ub
   }
 
+  # Initialize
+  phi = 0.5
+  rho = (rho_lb + rho_ub)/2
   beta_s = c(beta_intercept_scale, rep(beta_scale,p-1))
 
-  # Initialize
-  sigu2 = 0.5
-  rho = (rho_lb + rho_ub)/2
-  R = fields::Matern(distmat, range = rho, smoothness = smoothness)
-  Rinv = solve(R)
+
+  q = nrow(coords_knot)
+  #distmat_nn = fields::rdist(coords)
+  distmat_qq = fields::rdist(coords_knot)
+  distmat_nq = fields::rdist(coords, coords_knot)
+
+  Rqq = fields::Matern(distmat_qq, range = rho, smoothness = smoothness)
+  Rnq = fields::Matern(distmat_nq, range = rho, smoothness = smoothness)
+  #dnn = 1-diag(Rnq%*%solve(Rqq)%*%t(Rnq))
+  dnn = 1-rowSums(t(solve(Rqq, t(Rnq))) * Rnq)
+  Dnn = Matrix::Diagonal(n, dnn)
+  Dnninv = solve(Dnn)
+  #if(any(dnn > 0.5)) warning("too small initial rho?")
+  #R = Sig_pp + diag(dnn) # modified predictive process
+  #if(any(diag(R)!=1)) stop("diag(R)!=1")
+  #Rinv = solve(R)
+
+
+
+
+  #R = fields::Matern(distmat, range = rho, smoothness = smoothness)
+  #Rinv = solve(R)
+  lambda_particles = rbridgemixing(nparticle, phi = phi) # each row is a set of particles
+  lambda = lambda_particles[1]
   beta = rep(0,p)
   gamma = rep(2.5,p) # scale mixture
   linpred = X%*%beta
@@ -158,7 +183,8 @@ splogi_gaussian <- function(y, X, id,
   nmcmc = nburn + nsave*nthin
   rho_save = array(0, dim = c(nsave))
   beta_save = array(0, dim = c(nsave, p))
-  sigu2_save = array(0, dim = c(nsave))
+  phi_save = array(0, dim = c(nsave))
+  lambda_save = array(0, dim = c(nsave))
   u_save = array(0, dim =c(nsave, n))
   loglik_save = array(0, dim = c(nsave, N))
   acc_save = numeric(nmcmc)
@@ -166,7 +192,7 @@ splogi_gaussian <- function(y, X, id,
   #t1  = t2 = t3 = t4 = 0
   # adaptive MH tuning (Harrio)
   MH_eps = 0.001
-  MH_s_d = (2.38)^2/2 # denominator 2 corresponds to dimension (sigu2, rho)
+  MH_s_d = (2.38)^2/2 # denominator 2 corresponds to dimension (phi, rho)
   C0 = MH_s_d*diag(2)
   start_adapt = 100 # adapt after 100 iterations
 
@@ -194,7 +220,16 @@ splogi_gaussian <- function(y, X, id,
 
     ##### Step 1: update beta #####
     #t1_start = Sys.time()
-    nnmat_inv = solve(1/sigu2*Rinv + diag(omega_grp))
+
+    d1 = 1/(lambda*omega_grp + 1/dnn)
+    D1 = Matrix::Diagonal(n, d1)
+    d2 = 1/dnn - d1/dnn^2
+    D2 = Matrix::Diagonal(n, d2)
+    #all.equal(t(Rnq)%*%D2%*%Rnq, crossprod(sqrt(d2)*Rnq))
+
+    nnmat_inv = lambda*D1 + lambda*D1%*%Dnninv%*%Rnq%*%solve(Rqq + crossprod(Rnq*sqrt(d2)),t(Rnq))%*%Dnninv%*%D1
+    #nnmat_inv = solve(1/lambda*Rinv + diag(omega_grp))
+
     XtSigma_invX = XtOmegaX - Matrix::t(ZtOmegaX)%*%nnmat_inv%*%ZtOmegaX
     XtSigma_invY = Xtym0.5 - Matrix::t(ZtOmegaX)%*%nnmat_inv%*%Ztym0.5
 
@@ -210,70 +245,94 @@ splogi_gaussian <- function(y, X, id,
     # update Xbeta
     Xbeta = X%*%beta
 
-    ##### Step 1 - 2: update gamma
+
+
+    # update gamma
     if(!is.infinite(beta_df)){
       gamma = 1/rgamma(p, shape = beta_df/2 + 1/2, rate = beta_s^2*beta_df/2 + beta^2/2)
     }
 
 
     #t2_start = Sys.time()
-    ##### Step 2-1: update sigu2 and range parameter
-    # transform sigu2 to real based on exp transform
+    ##### Step 2-1: update lambda and phi, and range parameter
+    # transform phi\in (0,1) to real based on logistic transform
     # transform rho \in rho_lb, rho_ub to real based on logistic transform
     # on this transformed space, run random walk with bivariate normal proposal
 
-    sigu2_trans = log(sigu2)
+    phi_trans = glogit(phi, xmin = 0, xmax = 1)
     rho_trans = glogit(rho, xmin = rho_lb, xmax = rho_ub)
 
     if(imcmc < start_adapt){
-      proposal = c(sigu2_trans, rho_trans) + spam::rmvnorm(1, rep(0,2), C0)
+      proposal = c(phi_trans, rho_trans) + spam::rmvnorm(1, rep(0,2), C0)
     }else{
-      proposal = c(sigu2_trans, rho_trans) + spam::rmvnorm(1, rep(0,2), Ct)
+      proposal = c(phi_trans, rho_trans) + spam::rmvnorm(1, rep(0,2), Ct)
     }
-    sigu2_trans_star = proposal[1]; sigu2_star = exp(sigu2_trans_star)
+    phi_trans_star = proposal[1]; phi_star = inv_glogit(phi_trans_star, 0, 1)
     rho_trans_star = proposal[2]; rho_star = inv_glogit(rho_trans_star, rho_lb, rho_ub)
 
-    R_star = fields::Matern(distmat, range = rho_star, smoothness = smoothness)
+    lambda_particles_star = rbridgemixing(nparticle, phi = phi_star)
+
+    #D3 = Matrix::Diagonal(n, d3)
+
+
     y0.5_Xbomega = (y - 0.5) - Xbeta*omega
     #y0.5_Xbomega_grp = Rfast::group(y0.5_Xbomega, id, method = "sum") # t(Z)%*%y0.5_Xbomega
     y0.5_Xbomega_grp = as.numeric(rowsum(as.matrix(y0.5_Xbomega), group = id))
-    linpred_proxy = y0.5_Xbomega_grp/omega_grp
+    linpred_proxy = y0.5_Xbomega_grp/omega_grp # location in L(lambda)
 
 
-    cholSig = chol(diag(1/omega_grp)+sigu2*R)
-    logdetSig = 2*sum(log(diag(cholSig)))
-    logweights = -0.5*sum(backsolve(cholSig, linpred_proxy, transpose = T)^2) - 0.5*logdetSig - n/2*log(2*pi)
+    # collapsed likelihood evaluations
+    logweights = rep(0, nparticle)
+    for(iparticle in 1:nparticle){
+      d3inv = (lambda_particles[iparticle]*dnn + 1/omega_grp)
+      #mvnfast::dmvn(linpred_proxy, mu = rep(0,n), sigma = diag(1/omega_grp)+lambda_particles[iparticle]*R, log = T)
+      logweights[iparticle] = dmvn_lowrankstr(linpred_proxy, mu = rep(0,n),
+                                              X = Rnq, Dinv = Rqq/lambda_particles[iparticle],
+                                              Dlogdet = NULL, Ediag = d3inv, log = T)
+    }
 
-    cholSig = chol(diag(1/omega_grp)+sigu2_star*R_star)
-    logdetSig = 2*sum(log(diag(cholSig)))
-    logweights_star = -0.5*sum(backsolve(cholSig, linpred_proxy, transpose = T)^2) - 0.5*logdetSig - n/2*log(2*pi)
 
+    Rqq_star = fields::Matern(distmat_qq, range = rho_star, smoothness = smoothness)
+    Rnq_star = fields::Matern(distmat_nq, range = rho_star, smoothness = smoothness)
+    dnn_star = 1-rowSums(t(solve(Rqq_star, t(Rnq_star))) * Rnq_star )
+    logweights_star = rep(0, nparticle)
+    for(iparticle in 1:nparticle){
+      d3inv = (lambda_particles_star[iparticle]*dnn_star + 1/omega_grp)
+      logweights_star[iparticle] = dmvn_lowrankstr(linpred_proxy, mu = rep(0,n),
+                                              X = Rnq_star, Dinv = Rqq_star/lambda_particles_star[iparticle],
+                                              Dlogdet = NULL, Ediag = d3inv, log = T)
+    }
 
-    acc_ratio = log(sigu2_star) - log(sigu2) + # log transformation
+    acc_ratio = log(phi_star) + log(1-phi_star) - log(phi) - log(1-phi) +
       (log(rho_star-rho_lb) + log(rho_ub - rho_star)) - (log(rho-rho_lb) + log(rho_ub - rho)) + # log(rho_ub - rho_lb) terms or cancelled out # https://www.wolframalpha.com/input?i=d%2Fdx+log%28%28x-a%29%2F%28b-a%29%2F%281-%28x-a%29%2F%28b-a%29%29%29
-      logpriorsigu2(sigu2_star) - logpriorsigu2(sigu2) + # uniform prior on rho
-      logweights_star - logweights
+      logpriorphi(phi_star) - logpriorphi(phi) + # uniform prior on rho
+      matrixStats::logSumExp(logweights_star) - matrixStats::logSumExp(logweights)
 
     if(log(runif(1)) < acc_ratio){
-      sigu2 = sigu2_star; sigu2_trans = log(sigu2)
+      phi = phi_star; phi_trans = glogit(phi, xmin = 0, xmax = 1)
       rho = rho_star; rho_trans = glogit(rho, xmin = rho_lb, xmax = rho_ub)
-      R = R_star
-      Rinv = solve(R)
+      Rqq = Rqq_star
+      Rnq = Rnq_star
+      dnn = dnn_star
+      Dnn = Matrix::Diagonal(n, dnn)
+      Dnninv = solve(Dnn)
 
+      lambda = lambda_particles[sample(1:nparticle, size = 1, prob = exp(logweights - max(logweights)))]
       acc_save[imcmc] = 1
+      lambda_particles = lambda_particles_star
       logweights = logweights_star
     }
 
     # mut and Ct are recursively updated
     if(imcmc == 1){
-      mut = c(sigu2_trans, rho_trans)
+      mut = c(phi_trans, rho_trans)
       Ct = MH_s_d*MH_eps*diag(2)
     }else{
-      tmpmu = (mut*(imcmc-1)+c(sigu2_trans, rho_trans))/imcmc
+      tmpmu = (mut*(imcmc-1)+c(phi_trans, rho_trans))/imcmc
       # eq (3) of Haario et al. 2001
       Ct = (imcmc-1)*Ct/imcmc+MH_s_d/imcmc*(imcmc*tcrossprod(mut)-
                                               (imcmc+1)*tcrossprod(tmpmu) +
-                                              tcrossprod(c(sigu2_trans, rho_trans))+
+                                              tcrossprod(c(phi_trans, rho_trans))+
                                               MH_eps*diag(2))
       mut = tmpmu
     }
@@ -283,7 +342,14 @@ splogi_gaussian <- function(y, X, id,
 
     ##### Step 2-2: update random effects u
     #t3_start = Sys.time()
-    u = as.numeric(spam::rmvnorm.canonical(1, y0.5_Xbomega_grp, diag(omega_grp)+ 1/sigu2*Rinv))
+    d1 = 1/(lambda*omega_grp + 1/dnn)
+    D1 = Matrix::Diagonal(n, d1)
+    d2 = 1/dnn - d1/dnn^2
+    nnmat_inv = lambda*D1 + lambda*D1%*%Dnninv%*%Rnq%*%solve(Rqq + crossprod(Rnq*sqrt(d2)),t(Rnq))%*%Dnninv%*%D1
+
+
+    utilde = as.numeric(spam::rmvnorm.prec(1, rep(0, q), Rqq + crossprod(sqrt(d2)*Rnq)) )
+    u = as.numeric(nnmat_inv%*%y0.5_Xbomega_grp + sqrt(lambda)*D1%*%Dnninv%*%Rnq%*%utilde + rnorm(n, 0, sd = sqrt(lambda*d1)))
     #t3 = t3 + as.numeric(difftime(Sys.time(), t3_start, units = "secs"))
 
 
@@ -305,7 +371,8 @@ splogi_gaussian <- function(y, X, id,
     # save
     if((imcmc > nburn)&&((imcmc-nburn)%%nthin==0)){
       beta_save[isave,] = beta
-      sigu2_save[isave] = sigu2
+      lambda_save[isave] = lambda
+      phi_save[isave] = phi
       u_save[isave,] = u
       rho_save[isave] = rho
       loglik_save[isave,] = loglik
@@ -317,17 +384,19 @@ splogi_gaussian <- function(y, X, id,
 
 
   # waic
-
   out = list()
   if(is.null(colnames(X))){
     colnames(beta_save) = colnames(model.matrix(y~ -1+X))
   }else{
     colnames(beta_save) = colnames(X)
   }
-  sigu2_save = matrix(sigu2_save); colnames(sigu2_save) = "sigu2"
+  phi_save = matrix(phi_save); colnames(phi_save) = "phi"
+  lambda_save = matrix(lambda_save); colnames(lambda_save) = "lambda"
   rho_save = matrix(rho_save); colnames(rho_save) = "rho"
 
-  out$post_save = coda::mcmc(cbind(beta_save, sigu2_save, rho_save))
+  out$post_save = coda::mcmc(cbind(beta_save, phi_save, lambda_save, rho_save))
+  betam_save = beta_save*as.numeric(phi_save)
+  out$betam_save = coda::mcmc(betam_save)
   colnames(u_save) = unique(id)
   out$u_save = coda::mcmc(u_save)
 
@@ -337,11 +406,14 @@ splogi_gaussian <- function(y, X, id,
   out$loglik_save = loglik_save
   out$coords = coords
   out$nsave = nsave
+  out$coords_knot = coords_knot
+  out$q = q
 
   out$priors = priors
 
   out$t_mcmc = t_mcmc
   out$t_premcmc = t_premcmc
-  #out$times = c(t1,t2,t3,t4)
+
   return(out)
 }
+

@@ -17,13 +17,27 @@ This is a R software repository corresponding to the manuscript
 
 > "Marginally interpretable spatial logistic regression with bridge processes" by Changwoo Lee and David B. Dunson. arXiv preprint arXiv:2412.04744  https://arxiv.org/abs/2412.04744
 
-See R folder for the functions, which contains 
 
-- bridge.R: univariate and multivariate bridge distribution and normal variance mixing distributions
-- splogi_bridge.R: spatial logistic model with bridge process random effect, using Matern kernel
-- splogi_bridge_lowrank.R: spatial logistic model with bridge process random effect, using low-rank Matern kernel
-- splogi_gaussian.R: spatial logistic model with Gaussian process random effect, using Matern kernel
-- splogi_gaussian_lowrank.R: spatial logistic model with Gaussian process random effect, using low-rank Matern kernel
+## Installation
+
+You can install the development version from [GitHub](https://github.com/) with:
+
+```{r, eval = F}
+# install.packages("devtools")
+devtools::install_github("changwoo-lee/spbridge")
+```
+
+
+## Package manual
+
+See spbridge_1.0.0.1.pdf for the package manual and example codes.
+<!-- See R folder for the functions, which contains  -->
+
+<!-- - bridge.R: univariate and multivariate bridge distribution and normal variance mixing distributions -->
+<!-- - splogi_bridge.R: spatial logistic model with bridge process random effect, using Matern kernel -->
+<!-- - splogi_bridge_lowrank.R: spatial logistic model with bridge process random effect, using low-rank Matern kernel -->
+<!-- - splogi_gaussian.R: spatial logistic model with Gaussian process random effect, using Matern kernel -->
+<!-- - splogi_gaussian_lowrank.R: spatial logistic model with Gaussian process random effect, using low-rank Matern kernel -->
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -56,7 +70,7 @@ It contains $\sum_{i=1}^n N_i = 2035$ children's malaria infection statuses from
 We first load data from geoR package, and standardize the data following [Gelman et al (2008)](#references).
 
 ```{r}
-library(geoR)# read the data 
+library(spbridge)
 data(gambia)
 N = length(gambia$pos) # 2035
 y = gambia$pos # binary response, N = 2035 by 1 vector
@@ -88,16 +102,9 @@ scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(gr
 
 Now we fit the spatial logistic model with bridge process random effect for inference of both $\beta^M$ and $\beta$, as well as Gaussian process random effects for comparison of site-specific estimate $\beta$. We closely followed the choice of prior suggested by [Gelman (2006)](#references) and [Gelman et al (2008)](#references), e.g. Cauchy prior for regression coefficients; see the manuscript for detailed settings. Running times are less than 2 mins for 11,000 iteration under Apple M1 CPU environment.
 
-```{r, warning=F, message=F}
-source("R/bridge.R")
-source("R/miscfunctions.R")
-source("R/splogi_bridge.R")
-source("R/splogi_gaussian.R")
-```
-
 ```{r, cache = T}
 # spatial logistic model with bridge process random effect
-fit_bridge = splogi_bridge(y = y,
+fit_bridge = spbridge::splogi_bridge(y = y,
                    X = X,
                    id = id,
                    priors = list(beta_intercept_scale = 10,
@@ -107,7 +114,7 @@ fit_bridge = splogi_bridge(y = y,
                    smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 fit_bridge$t_mcmc
 # spatial logistic model with Gaussian process random effect
-fit_gaussian = splogi_gaussian(y = y,
+fit_gaussian = spbridge::splogi_gaussian(y = y,
                    X = X,
                    id = id,
                    priors = list(beta_intercept_scale = 10,
@@ -125,6 +132,7 @@ fit_gaussian$t_mcmc
 Now we summarize the MCMC results after back-transforming the data in the original scale. The conditional estimates are essentially identical. From the proposed model, we also obtain parameters with population-averaged interpretation as well that are comparable with results of [Cattelan and Varin (2018)](#references). The trace plot shows good convergence. 
 
 ```{r}
+library(bayesplot)
 scaleback <- function(x, centers, scales){
   c(x[1] - sum((x[-1] * centers) / scales),
     x[-1] / scales)

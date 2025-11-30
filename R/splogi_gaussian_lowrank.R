@@ -1,17 +1,10 @@
-library(Matrix)
-library(spam)
-library(fields)
-library(lme4)
-library(coda)
-library(matrixStats)
-library(BayesLogit)
-
 #' Spatial logistic model with Gaussian process random effect with low-rank structure
 #'
-#' logit( Pr(y_{ij} = 1 | X_{ij}, u(s_i)) ) = X_{ij}^T beta + u(s_i)
-#'  u(s) ~ Gaussian process with Matern correlation kernel with low-rank structure
-#'
-#' where i=1,...n corresponds to n spatial locations and
+#' \deqn{
+#' \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
+#'   = X_{ij}^\top \beta + u(s_i)
+#' }
+#' where u(s) ~ Gaussian process with Matern correlation kernel with low-rank structure, i=1,...n corresponds to n spatial locations and
 #' j=1,... N_i correspond to n_i responses at location i,
 #' resulting data of size N = N_1 + ... N_n.
 #'
@@ -20,13 +13,15 @@ library(BayesLogit)
 #' uniform prior for Matern range parameter rho (see fields::Matern),
 #' and for sigu2, we use prior that induces half-Cauchy prior on the standard deviation of u.
 #'
-#'  beta_intercept_scale: scale of intercept parameter (default 10)
-#'  beta_scale: scale of other beta parameters (default 2.5)
-#'  beta_df: degrees of freedom for t prior on beta (default Inf, normal prior)
-#'  logpriorsigu2: function for log-prior on sigu2 (default prior that induces half-Cauchy prior on the standard deviation of u.)
-#'  rho_lb: lower bound for range parameter rho (default min distance between coords)
-#'  rho_ub: upper bound for range parameter rho (default max distance between coords)
-#'
+#' priors is a named list with the following possible elements:
+#' \describe{
+#' \item{beta_intercept_scale}{scale of intercept parameter (default 10)}
+#' \item{beta_scale}{scale of other beta parameters (default 2.5)}
+#' \item{beta_df}{degrees of freedom for t prior on beta (default Inf, normal prior)}
+#' \item{logpriorsigu2}{function for log-prior on sigu2 (default prior that induces half-Cauchy prior on the standard deviation of u.)}
+#' \item{rho_lb}{lower bound for range parameter rho (default min distance between coords)}
+#' \item{rho_ub}{upper bound for range parameter rho (default max distance between coords)}
+#' }
 #'
 #' @param y N x 1 binary vector
 #' @param X N x p fixed-effect design matrix, including intercept
@@ -44,6 +39,42 @@ library(BayesLogit)
 #' @export
 #'
 #' @examples
+#' \donttest{
+#' library(spbridge)
+#' data(gambia)
+#' N = length(gambia$pos) # 2035
+#' y = gambia$pos # binary response, N = 2035 by 1 vector
+#' # define id based on spatial coords unique values
+#' id = as.numeric(factor(paste(gambia$x, gambia$y)))
+#' n = length(unique(id)) # 65
+#' coords = unique(cbind(gambia$x, gambia$y)/1000) # n by 2 matrix, in km
+#
+#' # standardized covariates following Gelman et al (2008)
+#' intercept = rep(1,N) # intercept
+#' age = scale(gambia$age/365, scale = 2*sd(gambia$age/365)) # in years
+#' netuse = gambia$netuse - mean(gambia$netuse)
+#' treated = gambia$treated - mean(gambia$treated)
+#' green = scale(gambia$green, scale = 2*sd(gambia$green))
+#' green2 = scale(gambia$green^2, scale = 2*sd(gambia$green^2))
+#' healthctr = gambia$phc - mean(gambia$phc)
+#'
+#' X = cbind(intercept, age, netuse, treated, green, green2, healthctr)
+#' colnames(X) = c("(Intercept)", "age", "netuse", "treated", "green", "green2", "healthctr")
+#'
+#' centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
+#'             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
+#' scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
+#' fit_bridge = spbridge::splogi_gaussian_lowrank(y = y,
+#'                                         X = X,
+#'                                         id = id,
+#'                                         priors = list(beta_intercept_scale = 10,
+#'                                                       beta_scale = 2.5, beta_df = Inf,
+#'                                                       rho_lb = 0.01, rho_ub = 100),
+#'                                         coords = coords,
+#'                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+#' }
+#'
+#'
 splogi_gaussian_lowrank <- function(y, X, id,
                                   coords, coords_knot,
                                   priors = list(beta_intercept_scale = 10,
@@ -165,8 +196,8 @@ splogi_gaussian_lowrank <- function(y, X, id,
   Xtym0.5 = crossprod(X, (y - 0.5))
   Ztym0.5 = crossprod(Z, (y - 0.5))
   # initialize
-  ZtOmegaX = (t(Z*omega)%*%X)
-  XtOmegaX = (t(X*omega)%*%X)
+  ZtOmegaX = (Matrix::t(Z*omega)%*%X)
+  XtOmegaX = (Matrix::t(X*omega)%*%X)
 
 
   t_end = Sys.time()
@@ -194,8 +225,8 @@ splogi_gaussian_lowrank <- function(y, X, id,
     nnmat_inv = sigu2*D1 + sigu2*D1%*%Dnninv%*%Rnq%*%solve(Rqq + crossprod(Rnq*sqrt(d2)),t(Rnq))%*%Dnninv%*%D1
     #nnmat_inv = solve(1/sigu2*Rinv + diag(omega_grp))
 
-    XtSigma_invX = XtOmegaX - t(ZtOmegaX)%*%nnmat_inv%*%ZtOmegaX
-    XtSigma_invY = Xtym0.5 - t(ZtOmegaX)%*%nnmat_inv%*%Ztym0.5
+    XtSigma_invX = XtOmegaX - Matrix::t(ZtOmegaX)%*%nnmat_inv%*%ZtOmegaX
+    XtSigma_invY = Xtym0.5 - Matrix::t(ZtOmegaX)%*%nnmat_inv%*%Ztym0.5
 
     if(!is.infinite(beta_df)){ # normal prior
       Q_beta = XtSigma_invX + diag(1/gamma, p)
@@ -318,8 +349,8 @@ splogi_gaussian_lowrank <- function(y, X, id,
     # update
     #omega_grp = Rfast::group(omega, id, method = "sum")
     omega_grp = as.numeric(rowsum(as.matrix(omega), group = id))
-    ZtOmegaX = (t(Z*omega)%*%X)
-    XtOmegaX = (t(X*omega)%*%X)
+    ZtOmegaX = (Matrix::t(Z*omega)%*%X)
+    XtOmegaX = (Matrix::t(X*omega)%*%X)
 
     # loglikelihood
     loglik = dbinom(y, size = 1, prob = 1/(1+exp(-linpred)), log = T)
