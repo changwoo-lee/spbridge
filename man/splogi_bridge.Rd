@@ -52,18 +52,15 @@ Returns list of
 \item{y}{response vector}
 \item{X}{fixed effect design matrix}
 \item{coords}{a n x 2 matrix of Euclidean coordinates}
-
-list, including posterior samples of beta, phi, rho, and u saved in "post_save".
-Population-averaged coefficient, which is beta*phi, is saved separately as "betam_save"
 }
 \description{
 \deqn{
 \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
   = X_{ij}^\top \beta + u(s_i)
 }
-where  u(s) ~ Bridge process with Matern correlation kernel, i=1,...n corresponds to n spatial locations and
+where  u(s) ~ Bridge process with parameter \eqn{\phi} and Matern correlation kernel, i=1,...n corresponds to n spatial locations and
 j=1,... N_i correspond to n_i responses at location i,
-resulting data of size N = N_1 + ... N_n.
+resulting data of size N = N_1 + ... N_n. The parameter \eqn{\phi} is estimated using empirical Bayes approach.
 }
 \details{
 Priors are specified by "priors" argument, which is a list of hyperparameters.
@@ -71,7 +68,7 @@ Specifically, we set zero centered normal or t prior for beta,
 uniform prior for Matern range parameter rho (see fields::Matern),
 and for phi, we use prior that induces half-Cauchy prior on the standard deviation of u.
 
-priors is a named list with the following possible elements:
+"priors" is a named list with the following possible elements:
 \describe{
 \item{beta_intercept_scale}{scale of intercept parameter (default 10)}
 \item{beta_scale}{scale of other beta parameters (default 2.5)}
@@ -105,14 +102,18 @@ colnames(X) = c("(Intercept)", "age", "netuse", "treated", "green", "green2", "h
 centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
 scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
-fit_bridge = spbridge::splogi_bridge(y = y,
-                                        X = X,
-                                        id = id,
-                                        priors = list(beta_intercept_scale = 10,
-                                                      beta_scale = 2.5, beta_df = Inf,
-                                                      rho_lb = 0.01, rho_ub = 100),
-                                        coords = coords,
-                                        smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+
+#
+# commented out due to a long run time
+#
+# fit_bridge = spbridge::splogi_bridge(y = y,
+#                                         X = X,
+#                                         id = id,
+#                                         priors = list(beta_intercept_scale = 10,
+#                                                       beta_scale = 2.5, beta_df = Inf,
+#                                                       rho_lb = 0.01, rho_ub = 100),
+#                                         coords = coords,
+#                                        smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 }
 
 

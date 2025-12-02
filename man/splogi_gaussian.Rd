@@ -40,16 +40,26 @@ splogi_gaussian(
 \item{verbose}{logical, whether to print progress}
 }
 \value{
-list, including posterior samples of beta, sigu2, rho, and u saved in "post_save".
+Returns list of
+\item{post_save}{a matrix of posterior samples (coda::mcmc) with nsave rows}
+\item{u_save}{a matrix of posterior samples (coda::mcmc) of random effects, with nsave rows}
+\item{loglik_save}{a nsave x n matrix of pointwise log-likelihood values, can be used for WAIC calculation.}
+\item{priors}{list of hyperprior information}
+\item{nsave}{number of MCMC samples}
+\item{t_mcmc}{wall-clock time for running MCMC}
+\item{t_premcmc}{wall-clock time for preprocessing before MCMC}
+\item{y}{response vector}
+\item{X}{fixed effect design matrix}
+\item{coords}{a n x 2 matrix of Euclidean coordinates}
 }
 \description{
 \deqn{
 \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
   = X_{ij}^\top \beta + u(s_i)
 }
-where u(s) ~ Gaussian process with Matern correlation kernel, i=1,...n corresponds to n spatial locations and
+where u(s) ~ Gaussian process with marginal variance sigu2 and Matern correlation kernel, i=1,...n corresponds to n spatial locations and
 j=1,... N_i correspond to n_i responses at location i,
-resulting data of size N = N_1 + ... N_n.
+resulting data of size N = N_1 + ... N_n. The parameter sigu2 is estimated using fully Bayesian approach by placing prior on it.
 }
 \details{
 Priors are specified by "priors" argument, which is a list of hyperparameters.
@@ -57,7 +67,7 @@ Specifically, we set zero centered normal or t prior for beta,
 uniform prior for Matern range parameter rho (see fields::Matern),
 and for sigu2, we use prior that induces half-Cauchy prior on the standard deviation of u.
 
-priors is a named list with the following possible elements:
+"priors" is a named list with the following possible elements:
 \describe{
 \item{beta_intercept_scale}{scale of intercept parameter (default 10)}
 \item{beta_scale}{scale of other beta parameters (default 2.5)}
@@ -92,14 +102,18 @@ colnames(X) = c("(Intercept)", "age", "netuse", "treated", "green", "green2", "h
 centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
 scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
-fit_bridge = spbridge::splogi_gaussian(y = y,
-                                        X = X,
-                                        id = id,
-                                        priors = list(beta_intercept_scale = 10,
-                                                      beta_scale = 2.5, beta_df = Inf,
-                                                      rho_lb = 0.01, rho_ub = 100),
-                                        coords = coords,
-                                        smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+
+#
+# please uncomment
+#
+# fit_gaussian = spbridge::splogi_gaussian(y = y,
+#                                         X = X,
+#                                         id = id,
+#                                         priors = list(beta_intercept_scale = 10,
+#                                                      beta_scale = 2.5, beta_df = Inf,
+#                                                       rho_lb = 0.01, rho_ub = 100),
+#                                         coords = coords,
+#                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 }
 
 }

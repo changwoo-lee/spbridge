@@ -4,16 +4,16 @@
 #' \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
 #'   = X_{ij}^\top \beta + u(s_i)
 #' }
-#' where  u(s) ~ Bridge process with Matern correlation kernel, i=1,...n corresponds to n spatial locations and
+#' where  u(s) ~ Bridge process with parameter \eqn{\phi} and Matern correlation kernel, i=1,...n corresponds to n spatial locations and
 #' j=1,... N_i correspond to n_i responses at location i,
-#' resulting data of size N = N_1 + ... N_n.
+#' resulting data of size N = N_1 + ... N_n. The parameter \eqn{\phi} is estimated using empirical Bayes approach.
 #'
 #' Priors are specified by "priors" argument, which is a list of hyperparameters.
 #' Specifically, we set zero centered normal or t prior for beta,
 #' uniform prior for Matern range parameter rho (see fields::Matern),
 #' and for phi, we use prior that induces half-Cauchy prior on the standard deviation of u.
 #'
-#' priors is a named list with the following possible elements:
+#' "priors" is a named list with the following possible elements:
 #' \describe{
 #' \item{beta_intercept_scale}{scale of intercept parameter (default 10)}
 #' \item{beta_scale}{scale of other beta parameters (default 2.5)}
@@ -45,10 +45,7 @@
 #' \item{y}{response vector}
 #' \item{X}{fixed effect design matrix}
 #' \item{coords}{a n x 2 matrix of Euclidean coordinates}
-
-
-#' @return list, including posterior samples of beta, phi, rho, and u saved in "post_save".
-#' Population-averaged coefficient, which is beta*phi, is saved separately as "betam_save"
+#'
 #' @export
 #'
 #' @examples
@@ -77,14 +74,18 @@
 #' centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
 #'             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
 #' scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
-#' fit_bridge = spbridge::splogi_bridge(y = y,
-#'                                         X = X,
-#'                                         id = id,
-#'                                         priors = list(beta_intercept_scale = 10,
-#'                                                       beta_scale = 2.5, beta_df = Inf,
-#'                                                       rho_lb = 0.01, rho_ub = 100),
-#'                                         coords = coords,
-#'                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+#'
+#' #
+#' # commented out due to a long run time
+#' #
+#' # fit_bridge = spbridge::splogi_bridge(y = y,
+#' #                                         X = X,
+#' #                                         id = id,
+#' #                                         priors = list(beta_intercept_scale = 10,
+#' #                                                       beta_scale = 2.5, beta_df = Inf,
+#' #                                                       rho_lb = 0.01, rho_ub = 100),
+#' #                                         coords = coords,
+#' #                                        smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 #' }
 #'
 #'
@@ -96,12 +97,12 @@ splogi_bridge <- function(y, X, id,
                                       rho_lb = NULL, rho_ub = NULL),
                         smoothness = 1.5,
                         nburn = 100, nsave = 1000, nthin = 1, verbose=TRUE){
+  t_start = Sys.time()
   print("Finding phi using pairwise composite likelihood...")
   fit_m  <- glm(y ~ -1 + X, family = binomial(link = "logit"))
   phi = estimate_phi_pairCL(y, id, mu_hat = as.numeric(predict(fit_m, type = "link")))$phi
   print(paste0("phihat =",phi))
 
-  t_start = Sys.time()
   #############################################
   n = length(unique(id)) # this is number of spatial locations, not total obs
   if(nrow(coords)!=n) stop("nrow(coords) must be equal to number of unique elements of id")
@@ -394,8 +395,8 @@ splogi_bridge <- function(y, X, id,
   out$post_save = coda::mcmc(cbind(beta_save, rho_save))
   # phi_save = matrix(phi_save); colnames(phi_save) = "phi"
   # out$phi_save = coda::mcmc(phi_save)
-  # colnames(u_save) = unique(id)
-  # out$u_save = coda::mcmc(u_save)
+  colnames(u_save) = unique(id)
+  out$u_save = coda::mcmc(u_save)
   # lambda_save = matrix(lambda_save); colnames(lambda_save) = "lambda"
   # out$lambda_save = coda::mcmc(lambda_save)
   # colnames(beta_save) = colnames(X)
@@ -405,7 +406,9 @@ splogi_bridge <- function(y, X, id,
   out$betam_save = beta_save*as.numeric(phi_save)
   lambda_save = matrix(lambda_save); colnames(lambda_save) = "lambda"
   out$lambda_save = coda::mcmc(lambda_save)
-
+  out$priors = priors
+  out$y = y
+  out$X = X
   out$smoothness = smoothness
   out$loglik_save = loglik_save
   out$coords = coords

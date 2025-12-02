@@ -4,9 +4,9 @@
 #' \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
 #'   = X_{ij}^\top \beta + u(s_i)
 #' }
-#' where u(s) ~ Gaussian process with Matern correlation kernel with low-rank structure, i=1,...n corresponds to n spatial locations and
+#' where u(s) ~ Gaussian process with marginal variance sigu2 and  Matern correlation kernel with low-rank structure, i=1,...n corresponds to n spatial locations and
 #' j=1,... N_i correspond to n_i responses at location i,
-#' resulting data of size N = N_1 + ... N_n.
+#' resulting data of size N = N_1 + ... N_n. The parameter sigu2 is estimated using fully Bayesian approach by placing prior on it.
 #'
 #' Priors are specified by "priors" argument, which is a list of hyperparameters.
 #' Specifically, we set zero centered normal or t prior for beta,
@@ -35,7 +35,20 @@
 #' @param nthin thin-in rate
 #' @param verbose logical, whether to print progress
 #'
-#' @return list, including posterior samples of beta, sigu2, rho, and u saved in "post_save".
+#' @returns Returns list of
+#' \item{post_save}{a matrix of posterior samples (coda::mcmc) with nsave rows}
+#' \item{u_save}{a matrix of posterior samples (coda::mcmc) of random effects, with nsave rows}
+#' \item{loglik_save}{a nsave x n matrix of pointwise log-likelihood values, can be used for WAIC calculation.}
+#' \item{priors}{list of hyperprior information}
+#' \item{nsave}{number of MCMC samples}
+#' \item{t_mcmc}{wall-clock time for running MCMC}
+#' \item{t_premcmc}{wall-clock time for preprocessing before MCMC}
+#' \item{y}{response vector}
+#' \item{X}{fixed effect design matrix}
+#' \item{coords}{a n x 2 matrix of Euclidean coordinates}
+#' \item{coords_knot}{a q x 2 matrix of knot coordinates}
+#'
+#'
 #' @export
 #'
 #' @examples
@@ -64,19 +77,28 @@
 #' centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
 #'             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
 #' scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
-#' fit_bridge = spbridge::splogi_gaussian_lowrank(y = y,
-#'                                         X = X,
-#'                                         id = id,
-#'                                         priors = list(beta_intercept_scale = 10,
-#'                                                       beta_scale = 2.5, beta_df = Inf,
-#'                                                       rho_lb = 0.01, rho_ub = 100),
-#'                                         coords = coords,
-#'                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+#'
+#' coords_knot = expand.grid(seq(quantile(coords[,1], 0.1), quantile(coords[,1], 0.9), length.out = 5),
+#'                          seq(quantile(coords[,2], 0.1), quantile(coords[,2], 0.9), length.out = 5))
+#'
+#'
+#' #
+#' # uncomment below
+#' #
+#' # fit_gaussian_lowrank = spbridge::splogi_gaussian_lowrank(y = y,
+#' #                                         X = X,
+#' #                                         id = id,
+#' #                                         priors = list(beta_intercept_scale = 10,
+#' #                                                       beta_scale = 2.5, beta_df = Inf,
+#' #                                                       rho_lb = 0.01, rho_ub = 100),
+#' #                                         coords = coords,
+#' #                                         coords_knot = coords_knot,
+#' #                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 #' }
 #'
 #'
 splogi_gaussian_lowrank <- function(y, X, id,
-                                  coords, coords_knot,
+                                  coords, coords_knot = NULL,
                                   priors = list(beta_intercept_scale = 10,
                                                 beta_scale = 2.5, beta_df = Inf,
                                                 logpriorsigu2 = NULL,
@@ -103,7 +125,14 @@ splogi_gaussian_lowrank <- function(y, X, id,
   }else{
     Z = Matrix(diag(n))
   }
-
+  if(is.null(coords_knot)){
+    #find bounding box
+    print("coords_knot not provided. Default using 5 x 5 grid over the bounding box of coords.")
+    min_coords = apply(coords, 2, min)
+    max_coords = apply(coords, 2, max)
+    coords_knot = expand.grid(seq(quantile(coords[,1], 0.1), quantile(coords[,1], 0.9), length.out = 5),
+                              seq(quantile(coords[,2], 0.1), quantile(coords[,2], 0.9), length.out = 5))
+  }
 
   distmat = fields::rdist(coords)
 

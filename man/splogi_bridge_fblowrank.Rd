@@ -46,17 +46,28 @@ splogi_bridge_fblowrank(
 \item{verbose}{logical, whether to print progress}
 }
 \value{
-list, including posterior samples of beta, phi, rho, and u saved in "post_save".
-Population-averaged coefficient, which is beta*phi, is saved separately as "betam_save"
+Returns list of
+\item{post_save}{a matrix of posterior samples (coda::mcmc) with nsave rows}
+\item{u_save}{a matrix of posterior samples (coda::mcmc) of random effects, with nsave rows}
+\item{betam_save}{a matrix of posterior samples (coda::mcmc) of population-averaged log odds, with nsave rows}
+\item{loglik_save}{a nsave x n matrix of pointwise log-likelihood values, can be used for WAIC calculation.}
+\item{priors}{list of hyperprior information}
+\item{nsave}{number of MCMC samples}
+\item{t_mcmc}{wall-clock time for running MCMC}
+\item{t_premcmc}{wall-clock time for preprocessing before MCMC}
+\item{y}{response vector}
+\item{X}{fixed effect design matrix}
+\item{coords}{a n x 2 matrix of Euclidean coordinates}
+\item{coords_knot}{a q x 2 matrix of knot coordinates}
 }
 \description{
 \deqn{
 \operatorname{logit}\left[ \Pr(y_{ij} = 1 \mid X_{ij}, u(s_i)) \right]
   = X_{ij}^\top \beta + u(s_i)
 }
-where u(s) ~ Bridge process with Matern correlation kernel with low-rank structure, i=1,...n corresponds to n spatial locations and
+where u(s) ~ Bridge process with parameter \eqn{\phi} and Matern correlation kernel with low-rank structure, i=1,...n corresponds to n spatial locations and
 j=1,... N_i correspond to n_i responses at location i,
-resulting data of size N = N_1 + ... N_n.
+resulting data of size N = N_1 + ... N_n. The parameter \eqn{\phi} is estimated using fully Bayesian approach by placing prior on it.
 }
 \details{
 Priors are specified by "priors" argument, which is a list of hyperparameters.
@@ -99,14 +110,22 @@ colnames(X) = c("(Intercept)", "age", "netuse", "treated", "green", "green2", "h
 centers = c(attr(age, "scaled:center"), mean(gambia$netuse), mean(gambia$treated),
             attr(green, "scaled:center"), attr(green2, "scaled:center"), mean(gambia$phc))
 scales = c(attr(age, "scaled:scale"), 1, 1, attr(green, "scaled:scale"), attr(green2, "scaled:scale"), 1)
-fit_bridge = spbridge::splogi_bridge_fblowrank(y = y,
-                                        X = X,
-                                        id = id,
-                                        priors = list(beta_intercept_scale = 10,
-                                                      beta_scale = 2.5, beta_df = Inf,
-                                                      rho_lb = 0.01, rho_ub = 100),
-                                        coords = coords,
-                                        smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
+
+coords_knot = expand.grid(seq(quantile(coords[,1], 0.1), quantile(coords[,1], 0.9), length.out = 5),
+                         seq(quantile(coords[,2], 0.1), quantile(coords[,2], 0.9), length.out = 5))
+
+#
+# uncomment below
+#
+# fit_bridge_fblowrank = spbridge::splogi_bridge_fblowrank(y = y,
+#                                         X = X,
+#                                         id = id,
+#                                         priors = list(beta_intercept_scale = 10,
+#                                                       beta_scale = 2.5, beta_df = Inf,
+#                                                       rho_lb = 0.01, rho_ub = 100),
+#                                         coords = coords,
+#                                         coords_knot = coords_knot,
+#                                         smoothness = 0.5, nburn = 1000, nsave = 10000, nthin = 1)
 }
 
 

@@ -1,6 +1,6 @@
 Package: spbridge
 Title: Marginally interpretable spatial logistic regression with bridge processes
-Version: 1.0.0.1
+Version: 1.0.0.2
 Authors@R:
   c(person("Changwoo",
            "Lee", 
@@ -9,7 +9,7 @@ Authors@R:
     person("David",
            "Dunson",
            role = c("aut")))
-Description: Provides functions for marginally interpretable spatial logistic regression with bridge processes. For details, see Lee and dunson (2025+) <doi:10.48550/arXiv.2412.04744>.
+Description: Provides functions for marginally interpretable spatial logistic regression with bridge processes. For details, see Lee and Dunson (2025+) <doi:10.48550/arXiv.2412.04744>.
 License: GPL (>= 3)
 URL: https://github.com/changwoo-lee/spbridge
 BugReports: https://github.com/changwoo-lee/spbridge/issues
