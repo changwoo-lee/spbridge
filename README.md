@@ -11,12 +11,11 @@ This is a R software repository corresponding to the manuscript
 
 ## Installation
 
-You can install the development version from
-[GitHub](https://github.com/) with:
+You can install the R package spbridge with:
 
 ``` r
 # install.packages("devtools")
-devtools::install_github("changwoo-lee/spbridge", build_manual = TRUE)
+devtools::install_github("changwoo-lee/spbridge")
 ```
 
 ## Package manual
@@ -28,7 +27,7 @@ library(spbridge)
 ?splogi_bridge
 ```
 
-See spbridge_1.0.0.1.pdf for the package manual and all available
+See spbridge_1.0.0.2.pdf for the package manual and all available
 functions.
 
 <!-- - bridge.R: univariate and multivariate bridge distribution and normal variance mixing distributions -->
