@@ -5,9 +5,7 @@
 
 This is a R software repository corresponding to the manuscript
 
-> “Marginally interpretable spatial logistic regression with bridge
-> processes” by Changwoo Lee and David B. Dunson. arXiv preprint
-> arXiv:2412.04744 <https://arxiv.org/abs/2412.04744>
+> Lee, C. J., & Dunson, D. B. (2026). Marginally interpretable spatial logistic regression with bridge processes. Statistics in Medicine, 45(3-5), e70399.  [https://doi.org/10.1002/sim.70399]
 
 ## Installation
 
